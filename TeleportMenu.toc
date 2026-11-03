@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: TeleportMenu
+## Notes: Minimap menu listing all teleport/portal spells and items you can currently use. Click to cast.
+## Author: liiora
+## Version: 1.0
+## SavedVariables: TeleportMenuDB
+
+TeleportMenu.lua
