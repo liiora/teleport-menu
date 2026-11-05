@@ -330,7 +330,7 @@ local function OpenMenu()
   menu:SetWidth(ROW_W + 16)
   menu:SetHeight(-y + 8)
   PlaceMenu()
-  menu.idle, menu.tick = 0, 0
+  menu.idle, menu.tick, menu.acc = 0, 0, 0
   menu:Show()
   RefreshCooldowns()
 end
@@ -354,17 +354,22 @@ local function CreateMenu()
   menu:SetBackdropColor(0, 0, 0, 0.92)
   menu:EnableMouse(true)
   menu:Hide()
-  menu.idle, menu.tick = 0, 0
+  menu.idle, menu.tick, menu.acc = 0, 0, 0
+  -- OnUpdate only fires while the menu is shown; throttled to ~10 Hz
   menu:SetScript("OnUpdate", function()
+    this.acc = this.acc + arg1
+    if this.acc < 0.1 then return end
+    local dt = this.acc
+    this.acc = 0
     -- auto-close when the mouse has been away for a moment
     if Over(this, 10) or Over(btn, 4) then
       this.idle = 0
     else
-      this.idle = this.idle + arg1
+      this.idle = this.idle + dt
       if this.idle > 0.8 then this:Hide() return end
     end
-    this.tick = this.tick + arg1
-    if this.tick > 0.5 then
+    this.tick = this.tick + dt
+    if this.tick >= 0.5 then
       this.tick = 0
       RefreshCooldowns()
     end
@@ -377,6 +382,16 @@ local function UpdateButtonPosition()
   local r = math.rad(a)
   btn:ClearAllPoints()
   btn:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 52 - 80 * math.cos(r), 80 * math.sin(r) - 52)
+end
+
+local function DragUpdate()
+  local x, y = GetCursorPosition()
+  local sc = UIParent:GetScale()
+  local xmin, ymin = Minimap:GetLeft(), Minimap:GetBottom()
+  x = xmin - x / sc + 70
+  y = y / sc - ymin - 70
+  TeleportMenuDB.angle = math.deg(math.atan2(y, x))
+  UpdateButtonPosition()
 end
 
 local function CreateButton()
@@ -402,17 +417,14 @@ local function CreateButton()
   btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   btn:RegisterForDrag("LeftButton")
   btn:SetScript("OnClick", function() ToggleMenu() end)
-  btn:SetScript("OnDragStart", function() this.dragging = true; GameTooltip:Hide() end)
-  btn:SetScript("OnDragStop", function() this.dragging = nil end)
-  btn:SetScript("OnUpdate", function()
-    if not this.dragging then return end
-    local x, y = GetCursorPosition()
-    local sc = UIParent:GetScale()
-    local xmin, ymin = Minimap:GetLeft(), Minimap:GetBottom()
-    x = xmin - x / sc + 70
-    y = y / sc - ymin - 70
-    TeleportMenuDB.angle = math.deg(math.atan2(y, x))
-    UpdateButtonPosition()
+  btn:SetScript("OnDragStart", function()
+    this.dragging = true
+    GameTooltip:Hide()
+    this:SetScript("OnUpdate", DragUpdate)   -- per-frame work only while dragging
+  end)
+  btn:SetScript("OnDragStop", function()
+    this.dragging = nil
+    this:SetScript("OnUpdate", nil)          -- back to zero per-frame cost
   end)
   btn:SetScript("OnEnter", function()
     if menu:IsVisible() or this.dragging then return end
@@ -437,6 +449,8 @@ f:SetScript("OnEvent", function()
   CreateMenu()
   CreateButton()
   UpdateButtonPosition()
+  this:UnregisterEvent("VARIABLES_LOADED")
+  this:SetScript("OnEvent", nil)
 end)
 
 local function RemoveFrom(t, name)
@@ -472,7 +486,7 @@ SlashCmdList["TELEPORTMENU"] = function(msg)
     UpdateButtonPosition()
     Print("Button position reset.")
   else
-    Print("/tpm - toggle menu")
+    Print("/tpm - show this help menu")
     Print("/tpm addspell <spell name> - add a custom spell (partial names ok)")
     Print("/tpm additem <item name> - add a custom item (partial names ok)")
     Print("/tpm del <name> - remove a custom entry")

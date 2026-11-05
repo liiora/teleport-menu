@@ -2,6 +2,10 @@
 
 A minimap menu for **WoW 1.12** that lists every teleport you can use right now and casts it with one click.
 
+<div align="center">
+  <img height="400" src="./screenshot1.png">
+</div>
+
 ## Features
 
 - Minimap button: left-click opens the menu, drag moves the button
