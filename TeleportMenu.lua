@@ -145,7 +145,7 @@ local function BuildList()
       if def.id then ok = (it.id == def.id) else ok = NameMatches(def, string.lower(it.name)) end
       if ok and not usedItem[it.id] then
         usedItem[it.id] = true
-        Add(res, def.g, { kind = "item", name = it.name, bag = it.bag, slot = it.slot, tex = it.tex })
+        Add(res, def.g, { kind = "item", id = it.id, name = it.name, bag = it.bag, slot = it.slot, tex = it.tex })
         if def.id then break end
       end
     end
@@ -203,6 +203,32 @@ end
 ---------------------------------------------------------------------------
 -- menu frame
 ---------------------------------------------------------------------------
+-- Windows for which UseContainerItem does something else entirely
+-- (bank = deposit, merchant = SELL, mail/trade/auction = attach item)
+local INTERACTION_FRAMES = { "BankFrame", "MerchantFrame", "MailFrame", "TradeFrame", "AuctionFrame" }
+
+local function InteractionWindowOpen()
+  for _, name in ipairs(INTERACTION_FRAMES) do
+    local fr = getglobal(name)
+    if fr and fr:IsVisible() then return true end
+  end
+  return false
+end
+
+local function UseItemEntry(e)
+  -- Nampower: uses the item directly, ignoring bank/vendor/mail context
+  if UseItemIdOrName and e.id then
+    UseItemIdOrName(e.id)
+    return
+  end
+  -- Fallback: never risk depositing/selling/attaching the item
+  if InteractionWindowOpen() then
+    Print("Close the bank/vendor/mail/trade window first (or install Nampower) to use " .. e.name .. ".")
+    return
+  end
+  UseContainerItem(e.bag, e.slot)
+end
+
 local function RowClick(row)
   local e = row.entry
   if not e then return end
@@ -210,7 +236,7 @@ local function RowClick(row)
   if e.kind == "spell" then
     CastSpellByName(e.name)
   else
-    UseContainerItem(e.bag, e.slot)
+    UseItemEntry(e)
   end
 end
 
@@ -486,7 +512,7 @@ SlashCmdList["TELEPORTMENU"] = function(msg)
     UpdateButtonPosition()
     Print("Button position reset.")
   else
-    Print("/tpm - show this help menu")
+    Print("/tpm - toggle menu")
     Print("/tpm addspell <spell name> - add a custom spell (partial names ok)")
     Print("/tpm additem <item name> - add a custom item (partial names ok)")
     Print("/tpm del <name> - remove a custom entry")
